@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Identidade G7: fundo branco, preto e verde-limão (#C8F31D).
+   O token "azul" virou o verde-limão da marca; "sobre-azul" é a cor do texto em cima dele. */
+:root {
+  color-scheme: light;
+  --fundo: 255 255 255;
+  --superficie: 255 255 255;
+  --superficie2: 244 245 241;
+  --tinta: 10 10 10;
+  --apagado: 95 99 88;
+  --linha: 226 228 220;
+  --azul: 200 243 29;
+  --sobre-azul: 10 10 10;
+  --azul-suave: 241 252 206;
+  --azul-tinta: 63 98 18;
+  --ambar: 245 158 11;
+  --ambar-suave: 254 243 199;
+  --ambar-tinta: 146 64 14;
+  --vermelho: 220 38 38;
+  --vermelho-suave: 254 226 226;
+  --vermelho-tinta: 185 28 28;
+  --verde: 34 197 94;
+  --verde-suave: 220 252 231;
+  --verde-tinta: 21 128 61;
+}
+
+/* Verde-limão some em cima do branco: texto e borda de foco usam o tom escuro */
+.text-azul {
+  color: rgb(var(--azul-tinta));
+}
+
+.focus\:border-azul:focus {
+  border-color: rgb(var(--azul-tinta));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-fundo text-tinta antialiased;
+  font-family: 'Sora', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.titulo {
+  letter-spacing: -0.025em;
+}
+
+/* Datas e horários em JetBrains Mono */
+.numeros {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--azul-tinta));
+  outline-offset: 2px;
+}
+
+input[type='date'] {
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@tailwind variants;
