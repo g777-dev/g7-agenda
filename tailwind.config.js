@@ -6,7 +6,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Archivo', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Sora', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {
         fundo: cor('fundo'),
@@ -19,6 +20,7 @@ export default {
         'ambar-suave': cor('ambar-suave'),
         'ambar-tinta': cor('ambar-tinta'),
         azul: cor('azul'),
+        sobre: cor('sobre-azul'),
         'azul-suave': cor('azul-suave'),
         'azul-tinta': cor('azul-tinta'),
         vermelho: cor('vermelho'),
