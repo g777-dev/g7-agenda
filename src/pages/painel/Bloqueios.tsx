@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios } from '../../lib/dados';
 import { PERIODOS, ehFimDeSemana, fmtData, hojeBR, nomeDia, nomeFeriado, somarDias } from '../../lib/datas';
-import type { Periodo } from '../../lib/tipos';
+import type { Bloqueio, Periodo } from '../../lib/tipos';
 import { Aviso, Botao, Campo, Cartao, Carregando, Entrada, Selecao, Vazio, useToast } from '../../components/ui';
 
 export default function Bloqueios() {
@@ -17,6 +17,24 @@ export default function Bloqueios() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [removendo, setRemovendo] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  const limpar = () => {
+    setEditandoId(null);
+    setData('');
+    setPeriodo('');
+    setMotivo('');
+    setErro(null);
+  };
+
+  const editar = (b: Bloqueio) => {
+    setEditandoId(b.id);
+    setData(b.data);
+    setPeriodo(b.periodo ?? '');
+    setMotivo(b.motivo ?? '');
+    setErro(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const ordenados = useMemo(
     () => [...lista].sort((a, b) => (a.data + (a.periodo ?? '')).localeCompare(b.data + (b.periodo ?? ''))),
@@ -37,16 +55,17 @@ export default function Bloqueios() {
   const criar = async () => {
     setErro(null);
     if (!data) return setErro('Escolha a data.');
-    if (data < hoje) return setErro('Escolha uma data a partir de hoje.');
+    if (!editandoId && data < hoje) return setErro('Escolha uma data a partir de hoje.');
     if (!motivo.trim()) return setErro('Informe o motivo. Ex.: feriado municipal, folga, manutenção do equipamento.');
     setSalvando(true);
-    const { error } = await supabase.from('bloqueios').insert({ data, periodo: periodo || null, motivo: motivo.trim() });
+    const campos = { data, periodo: periodo || null, motivo: motivo.trim() };
+    const { error } = editandoId
+      ? await supabase.from('bloqueios').update(campos).eq('id', editandoId)
+      : await supabase.from('bloqueios').insert(campos);
     setSalvando(false);
     if (error) return setErro(mensagemErro(error));
-    mostrar('Bloqueio criado.');
-    setData('');
-    setPeriodo('');
-    setMotivo('');
+    mostrar(editandoId ? 'Alterações salvas.' : 'Bloqueio criado.');
+    limpar();
     recarregar();
   };
 
@@ -67,10 +86,10 @@ export default function Bloqueios() {
       <p className="mt-1 text-apagado">Feche um dia ou um período da agenda. Clientes não conseguem pedir horários bloqueados.</p>
 
       <Cartao className="mt-6 p-5">
-        <h2 className="titulo text-xl font-bold">Novo bloqueio</h2>
+        <h2 className="titulo text-xl font-bold">{editandoId ? 'Editar bloqueio' : 'Novo bloqueio'}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Campo rotulo="Data" htmlFor="b-data">
-            <Entrada id="b-data" type="date" min={hoje} value={data} onChange={(e) => setData(e.target.value)} />
+            <Entrada id="b-data" type="date" min={editandoId ? undefined : hoje} value={data} onChange={(e) => setData(e.target.value)} />
           </Campo>
           <Campo rotulo="O que bloquear" htmlFor="b-periodo">
             <Selecao id="b-periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo | '')}>
@@ -98,9 +117,14 @@ export default function Bloqueios() {
         <Aviso tipo="info" className="mt-4">
           Bloquear não cancela gravações que já estão confirmadas nesse horário. Remarque essas pela Agenda.
         </Aviso>
-        <div className="mt-4">
+        <div className="mt-4 flex gap-2">
+          {editandoId && (
+            <Botao variante="secundario" onClick={limpar}>
+              Voltar
+            </Botao>
+          )}
           <Botao onClick={criar} carregando={salvando}>
-            Criar bloqueio
+            {editandoId ? 'Salvar alterações' : 'Criar bloqueio'}
           </Botao>
         </div>
       </Cartao>
@@ -121,6 +145,10 @@ export default function Bloqueios() {
                     {b.periodo ? `${PERIODOS[b.periodo].nome} (${PERIODOS[b.periodo].horario})` : 'Dia inteiro'}: {b.motivo}
                   </p>
                 </div>
+                <div className="flex gap-1">
+                <Botao variante="fantasma" tamanho="p" icone={<Pencil className="h-4 w-4" />} onClick={() => editar(b)}>
+                  Editar
+                </Botao>
                 <Botao
                   variante="fantasma"
                   tamanho="p"
@@ -130,6 +158,7 @@ export default function Bloqueios() {
                 >
                   Remover
                 </Botao>
+                </div>
               </li>
             ))}
           </ul>

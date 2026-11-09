@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios } from '../../lib/dados';
 import { fmtData, fmtMes, hojeBR, janelaClienteNovo, mesDe, proximosMeses, somarDias } from '../../lib/datas';
-import { copiarTexto, gerarSenha, gerenciarAcesso, linkDoSistema } from '../../lib/acesso';
+import { SENHA_PADRAO, copiarTexto, gerarSenha, gerenciarAcesso, linkDoSistema } from '../../lib/acesso';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Cliente, Janela } from '../../lib/tipos';
 import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, Entrada, Selecao, Selo, useToast } from '../../components/ui';
@@ -154,7 +154,7 @@ function PainelLink({
   const janela = ehNovo && cliente?.data_onboarding ? janelaClienteNovo(cliente.data_onboarding, mapa) : null;
 
   useEffect(() => {
-    setSenha('');
+    setSenha(clienteId ? SENHA_PADRAO : '');
     setErro(null);
   }, [clienteId]);
 
@@ -167,7 +167,7 @@ function PainelLink({
     setGerando(false);
     if (r.error) return setErro(r.error);
     setSenha(nova);
-    mostrar(`Nova senha criada para ${cliente.empresa}. A senha antiga deixou de funcionar.`);
+    mostrar(`A senha de ${cliente.empresa} agora é ${nova}.`);
   };
 
   const mensagem = cliente
@@ -230,7 +230,7 @@ function PainelLink({
               ))}
             </Selecao>
           </Campo>
-          <Campo rotulo="Senha" htmlFor="msg-senha" dica="Digite a senha atual do cliente ou gere uma nova.">
+          <Campo rotulo="Senha" htmlFor="msg-senha" dica={`Senha padrão dos clientes: ${SENHA_PADRAO}. "Aplicar" garante que ela vale para este cliente.`}>
             <div className="flex gap-2">
               <Entrada id="msg-senha" value={senha} onChange={(e) => setSenha(e.target.value)} disabled={!cliente} />
               <Botao
@@ -240,7 +240,7 @@ function PainelLink({
                 carregando={gerando}
                 onClick={gerar}
               >
-                Gerar
+                Aplicar
               </Botao>
             </div>
           </Campo>

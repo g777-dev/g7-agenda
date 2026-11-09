@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, History, KeyRound, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
+import { Copy, History, KeyRound, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { mensagemErro } from '../../lib/erros';
 import { useBloqueios } from '../../lib/dados';
 import { fmtData, fmtSlot, hojeBR, janelaClienteNovo, somarDias } from '../../lib/datas';
-import { gerarSenha, gerenciarAcesso, linkDoSistema, normalizarUsuario } from '../../lib/acesso';
+import { SENHA_PADRAO, gerarSenha, gerenciarAcesso, linkDoSistema, normalizarUsuario } from '../../lib/acesso';
 import type { Cliente, Gravacao, TipoCliente } from '../../lib/tipos';
 import {
   AreaTexto,
@@ -39,6 +38,7 @@ export default function Clientes() {
   const [historico, setHistorico] = useState<Cliente | null>(null);
   const [senhaDe, setSenhaDe] = useState<Cliente | null>(null);
   const [acesso, setAcesso] = useState<DadosAcesso | null>(null);
+  const [removendo, setRemovendo] = useState<Cliente | null>(null);
 
   const carregar = useCallback(async () => {
     const { data } = await supabase.from('clientes').select('*').order('empresa');
@@ -67,7 +67,10 @@ export default function Clientes() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="titulo text-3xl font-bold">Clientes</h1>
-          <p className="mt-1 text-apagado">Aqui a equipe G7 cria o login (usuário e senha) de cada cliente.</p>
+          <p className="mt-1 text-apagado">
+            Aqui a equipe G7 cria, edita e remove o login de cada cliente. Senha padrão:{' '}
+            <span className="numeros font-semibold text-tinta">{SENHA_PADRAO}</span>
+          </p>
         </div>
         <Botao icone={<Plus className="h-4 w-4" />} onClick={() => setEditando('novo')}>
           Criar login de cliente
@@ -142,6 +145,13 @@ export default function Clientes() {
                         <Botao variante="fantasma" tamanho="p" icone={<Pencil className="h-4 w-4" />} onClick={() => setEditando(c)}>
                           Editar
                         </Botao>
+                        <Botao
+                          variante="fantasma"
+                          tamanho="p"
+                          icone={<Trash2 className="h-4 w-4" />}
+                          onClick={() => setRemovendo(c)}
+                          aria-label={`Remover ${c.empresa}`}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -156,6 +166,7 @@ export default function Clientes() {
       <SenhaModal cliente={senhaDe} aoFechar={() => setSenhaDe(null)} aoTrocar={setAcesso} />
       <AcessoModal dados={acesso} aoFechar={() => setAcesso(null)} />
       <HistoricoModal cliente={historico} aoFechar={() => setHistorico(null)} />
+      <RemoverClienteModal cliente={removendo} aoFechar={() => setRemovendo(null)} aoRemover={carregar} />
     </div>
   );
 }
@@ -181,6 +192,7 @@ function ClienteModal({
   const [usuario, setUsuario] = useState('');
   const [usuarioEditado, setUsuarioEditado] = useState(false);
   const [senha, setSenha] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
   const [tipo, setTipo] = useState<TipoCliente>('novo');
   const [onboarding, setOnboarding] = useState('');
   const [ativo, setAtivo] = useState(true);
@@ -197,6 +209,7 @@ function ClienteModal({
     setUsuario(existente?.usuario ?? '');
     setUsuarioEditado(false);
     setSenha(cliente === 'novo' ? gerarSenha() : '');
+    setNovaSenha('');
     setTipo(existente?.tipo ?? 'novo');
     setOnboarding(existente?.data_onboarding ?? (cliente === 'novo' ? hoje : ''));
     setAtivo(existente?.ativo ?? true);
@@ -237,20 +250,25 @@ function ClienteModal({
       return;
     }
 
-    const { error } = await supabase
-      .from('clientes')
-      .update({
-        empresa: empresa.trim(),
-        nome_contato: contato.trim(),
-        whatsapp: whatsapp.trim() || null,
-        tipo,
-        data_onboarding: onboarding || null,
-        ativo,
-      })
-      .eq('id', existente.id);
+    if (novaSenha && novaSenha.trim().length < 6) {
+      setSalvando(false);
+      return setErro('A senha precisa ter pelo menos 6 caracteres.');
+    }
+    const r = await gerenciarAcesso({
+      acao: 'editar_cliente',
+      cliente_id: existente.id,
+      usuario,
+      senha: novaSenha.trim(),
+      empresa: empresa.trim(),
+      nome_contato: contato.trim(),
+      whatsapp: whatsapp.trim() || null,
+      tipo,
+      data_onboarding: onboarding || null,
+      ativo,
+    });
     setSalvando(false);
-    if (error) return setErro(mensagemErro(error));
-    mostrar('Cliente atualizado.');
+    if (r.error) return setErro(r.error);
+    mostrar(novaSenha ? 'Cliente e senha salvos.' : 'Alterações salvas.');
     aoSalvar();
     aoFechar();
   };
@@ -285,10 +303,31 @@ function ClienteModal({
         </div>
 
         {existente ? (
-          <div className="rounded-lg bg-superficie2 p-3 text-sm">
-            <span className="text-apagado">Usuário de login: </span>
-            <span className="numeros font-semibold">{existente.usuario}</span>
-            <p className="mt-1 text-xs text-apagado">Para trocar a senha, use o botão "Senha" na lista de clientes.</p>
+          <div className="grid gap-4 rounded-lg border border-azul/40 bg-azul-suave/30 p-4 sm:grid-cols-2">
+            <Campo rotulo="Usuário de login" htmlFor="c-usuario" dica="Minúsculas, sem espaço e sem acento.">
+              <Entrada
+                id="c-usuario"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={usuario}
+                onChange={(e) => setUsuario(normalizarUsuario(e.target.value))}
+                className="numeros"
+              />
+            </Campo>
+            <Campo rotulo="Nova senha" htmlFor="c-nova-senha" dica="Deixe vazio para manter a senha atual.">
+              <div className="flex gap-2">
+                <Entrada
+                  id="c-nova-senha"
+                  value={novaSenha}
+                  placeholder="Manter a atual"
+                  onChange={(e) => setNovaSenha(e.target.value)}
+                  className="numeros"
+                />
+                <Botao variante="secundario" onClick={() => setNovaSenha(SENHA_PADRAO)}>
+                  Padrão
+                </Botao>
+              </div>
+            </Campo>
           </div>
         ) : (
           <div className="grid gap-4 rounded-lg border border-azul/40 bg-azul-suave/30 p-4 sm:grid-cols-2">
@@ -308,12 +347,9 @@ function ClienteModal({
             <Campo rotulo="Senha" htmlFor="c-senha" dica="Pelo menos 6 caracteres.">
               <div className="flex gap-2">
                 <Entrada id="c-senha" value={senha} onChange={(e) => setSenha(e.target.value)} className="numeros" />
-                <Botao
-                  variante="secundario"
-                  icone={<RefreshCw className="h-4 w-4" />}
-                  onClick={() => setSenha(gerarSenha())}
-                  aria-label="Gerar outra senha"
-                />
+                <Botao variante="secundario" icone={<RefreshCw className="h-4 w-4" />} onClick={() => setSenha(gerarSenha())}>
+                  Padrão
+                </Botao>
               </div>
             </Campo>
           </div>
@@ -414,12 +450,9 @@ function SenhaModal({
         <Campo rotulo="Nova senha" htmlFor="nova-senha" dica="Pelo menos 6 caracteres.">
           <div className="flex gap-2">
             <Entrada id="nova-senha" value={senha} onChange={(e) => setSenha(e.target.value)} className="numeros" />
-            <Botao
-              variante="secundario"
-              icone={<RefreshCw className="h-4 w-4" />}
-              onClick={() => setSenha(gerarSenha())}
-              aria-label="Gerar outra senha"
-            />
+            <Botao variante="secundario" icone={<RefreshCw className="h-4 w-4" />} onClick={() => setSenha(gerarSenha())}>
+              Padrão
+            </Botao>
           </div>
         </Campo>
         {erro && <Aviso tipo="erro">{erro}</Aviso>}
@@ -453,7 +486,7 @@ function AcessoModal({ dados, aoFechar }: { dados: DadosAcesso | null; aoFechar:
   return (
     <Modal aberto aoFechar={aoFechar} titulo={`Acesso de ${dados.empresa}`} rodape={<Botao onClick={aoFechar}>Pronto</Botao>}>
       <div className="space-y-4">
-        <Aviso tipo="atencao">Anote ou envie a senha agora. Por segurança, ela não fica salva para consulta depois.</Aviso>
+        <Aviso tipo="info">Envie o acesso para o cliente. A senha padrão dos clientes é {SENHA_PADRAO}.</Aviso>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg bg-superficie2 p-4">
           <dt className="text-sm text-apagado">Usuário</dt>
           <dd className="numeros font-semibold">{dados.usuario}</dd>
@@ -521,6 +554,63 @@ function HistoricoModal({ cliente, aoFechar }: { cliente: Cliente | null; aoFech
           ))}
         </ul>
       )}
+    </Modal>
+  );
+}
+
+/** Remove o cliente, as gravações e solicitações dele e apaga o login. */
+function RemoverClienteModal({
+  cliente,
+  aoFechar,
+  aoRemover,
+}: {
+  cliente: Cliente | null;
+  aoFechar: () => void;
+  aoRemover: () => void;
+}) {
+  const { mostrar } = useToast();
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => setErro(null), [cliente]);
+
+  if (!cliente) return null;
+
+  const remover = async () => {
+    setErro(null);
+    setSalvando(true);
+    const r = await gerenciarAcesso({ acao: 'remover_cliente', cliente_id: cliente.id });
+    setSalvando(false);
+    if (r.error) return setErro(r.error);
+    mostrar(`${cliente.empresa} foi removido.`);
+    aoRemover();
+    aoFechar();
+  };
+
+  return (
+    <Modal
+      aberto
+      aoFechar={aoFechar}
+      titulo={`Remover ${cliente.empresa}?`}
+      rodape={
+        <>
+          <Botao variante="secundario" onClick={aoFechar}>
+            Voltar
+          </Botao>
+          <Botao variante="perigo" onClick={remover} carregando={salvando}>
+            Remover de vez
+          </Botao>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm">
+        <p>
+          O login <span className="numeros font-semibold">{cliente.usuario}</span> para de funcionar e as gravações e solicitações
+          desse cliente são apagadas. Não dá para desfazer.
+        </p>
+        <p className="text-apagado">Se quiser só bloquear o acesso e manter o histórico, use Editar e desmarque "Cliente ativo".</p>
+        {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      </div>
     </Modal>
   );
 }

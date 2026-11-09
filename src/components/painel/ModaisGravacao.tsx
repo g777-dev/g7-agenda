@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CalendarClock, CircleCheck, CircleX, History, Paperclip } from 'lucide-react';
+import { Ban, CalendarClock, CircleCheck, CircleX, History, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios } from '../../lib/dados';
 import { fmtData, fmtSlot, hojeBR, janelaClienteNovo, somarDias } from '../../lib/datas';
 import { abrirAnexo } from '../../lib/anexos';
-import type { Cliente, Gravacao, Slot } from '../../lib/tipos';
+import type { Cliente, Gravacao, LocalTipo, Periodo, Slot, StatusGravacao } from '../../lib/tipos';
 import { AreaTexto, Aviso, Botao, Campo, Entrada, Modal, Selecao, Selo, useToast } from '../ui';
 import { ResumoHorario } from '../comuns';
 import { EscolherHorarioModal, ModalMotivo, useConflito, useMover } from './acoes';
@@ -26,6 +26,8 @@ export function GravacaoModal({
   const [cancelando, setCancelando] = useState(false);
   const [naoRealizada, setNaoRealizada] = useState(false);
   const [marcando, setMarcando] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const { mover, modal: modalMover } = useMover(() => {
     aoMudar();
     aoFechar();
@@ -76,11 +78,18 @@ export function GravacaoModal({
   return (
     <>
       <Modal
-        aberto={!remarcando && !cancelando && !naoRealizada}
+        aberto={!remarcando && !cancelando && !naoRealizada && !editando && !excluindo}
         aoFechar={aoFechar}
         titulo={cliente?.empresa ?? 'Gravação'}
         rodape={
-          confirmada ? (
+          <>
+            <Botao variante="fantasma" icone={<Trash2 className="h-4 w-4" />} onClick={() => setExcluindo(true)}>
+              Excluir
+            </Botao>
+            <Botao variante="secundario" icone={<Pencil className="h-4 w-4" />} onClick={() => setEditando(true)}>
+              Editar
+            </Botao>
+          {confirmada && (
             <>
               <Botao variante="perigo" icone={<CircleX className="h-4 w-4" />} onClick={() => setCancelando(true)}>
                 Cancelar
@@ -103,7 +112,8 @@ export function GravacaoModal({
                 </>
               )}
             </>
-          ) : undefined
+          )}
+          </>
         }
       >
         <div className="space-y-4">
@@ -205,7 +215,147 @@ export function GravacaoModal({
         aoConfirmar={cancelar}
       />
       {modalMover}
+      {editando && (
+        <EditarGravacaoModal
+          gravacao={gravacao}
+          aoFechar={() => setEditando(false)}
+          aoSalvar={() => {
+            setEditando(false);
+            aoMudar();
+            aoFechar();
+          }}
+        />
+      )}
+      <Modal
+        aberto={excluindo}
+        aoFechar={() => setExcluindo(false)}
+        titulo={`Excluir gravação de ${cliente?.empresa ?? ''}?`}
+        rodape={
+          <>
+            <Botao variante="secundario" onClick={() => setExcluindo(false)}>
+              Voltar
+            </Botao>
+            <Botao
+              variante="perigo"
+              icone={<Trash2 className="h-4 w-4" />}
+              onClick={async () => {
+                const { error } = await supabase.from('gravacoes').delete().eq('id', gravacao.id);
+                if (error) return mostrar(mensagemErro(error), 'erro');
+                mostrar('Gravação excluída.');
+                setExcluindo(false);
+                aoMudar();
+                aoFechar();
+              }}
+            >
+              Excluir de vez
+            </Botao>
+          </>
+        }
+      >
+        <p className="text-sm">
+          A gravação some da agenda e do histórico. Para manter o registro, prefira <strong>Cancelar</strong>.
+        </p>
+      </Modal>
     </>
+  );
+}
+
+// ---------- Editar qualquer campo de uma gravação (data, período, local, status...) ----------
+
+function EditarGravacaoModal({
+  gravacao,
+  aoFechar,
+  aoSalvar,
+}: {
+  gravacao: Gravacao;
+  aoFechar: () => void;
+  aoSalvar: () => void;
+}) {
+  const { mostrar } = useToast();
+  const [data, setData] = useState(gravacao.data);
+  const [periodo, setPeriodo] = useState<Periodo>(gravacao.periodo);
+  const [local, setLocal] = useState<LocalTipo>(gravacao.local_tipo);
+  const [endereco, setEndereco] = useState(gravacao.endereco ?? '');
+  const [observacoes, setObservacoes] = useState(gravacao.observacoes ?? '');
+  const [status, setStatus] = useState<StatusGravacao>(gravacao.status);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const salvar = async () => {
+    setErro(null);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return setErro('Escolha uma data válida.');
+    setSalvando(true);
+    const { error } = await supabase.rpc('editar_gravacao', {
+      p_gravacao_id: gravacao.id,
+      p_data: data,
+      p_periodo: periodo,
+      p_local_tipo: local,
+      p_endereco: local === 'cliente' ? endereco : '',
+      p_observacoes: observacoes,
+      p_status: status,
+    });
+    setSalvando(false);
+    if (error) return setErro(mensagemErro(error));
+    mostrar('Alterações salvas.');
+    aoSalvar();
+  };
+
+  return (
+    <Modal
+      aberto
+      aoFechar={aoFechar}
+      titulo={`Editar gravação${gravacao.clientes ? ` de ${gravacao.clientes.empresa}` : ''}`}
+      rodape={
+        <>
+          <Botao variante="secundario" onClick={aoFechar}>
+            Voltar
+          </Botao>
+          <Botao onClick={salvar} carregando={salvando}>
+            Salvar alterações
+          </Botao>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo rotulo="Data" htmlFor="eg-data">
+            <Entrada id="eg-data" type="date" value={data} onChange={(e) => setData(e.target.value)} />
+          </Campo>
+          <Campo rotulo="Período" htmlFor="eg-periodo">
+            <Selecao id="eg-periodo" value={periodo} onChange={(e) => setPeriodo(e.target.value as Periodo)}>
+              <option value="manha">Manhã (09:30–12:00)</option>
+              <option value="tarde">Tarde (14:30–17:00)</option>
+            </Selecao>
+          </Campo>
+          <Campo rotulo="Local" htmlFor="eg-local">
+            <Selecao id="eg-local" value={local} onChange={(e) => setLocal(e.target.value as LocalTipo)}>
+              <option value="estudio">Estúdio da G7</option>
+              <option value="cliente">No local do cliente</option>
+            </Selecao>
+          </Campo>
+          <Campo rotulo="Situação" htmlFor="eg-status">
+            <Selecao id="eg-status" value={status} onChange={(e) => setStatus(e.target.value as StatusGravacao)}>
+              <option value="confirmada">Confirmada</option>
+              <option value="realizada">Realizada</option>
+              <option value="nao_realizada">Não realizada</option>
+              <option value="cancelada">Cancelada</option>
+            </Selecao>
+          </Campo>
+        </div>
+        {local === 'cliente' && (
+          <Campo rotulo="Endereço" htmlFor="eg-endereco">
+            <Entrada id="eg-endereco" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+          </Campo>
+        )}
+        <Campo rotulo="Observações" htmlFor="eg-obs">
+          <AreaTexto id="eg-obs" rows={4} value={observacoes} onChange={(e) => setObservacoes(e.target.value)} />
+        </Campo>
+        <p className="text-xs text-apagado">
+          A equipe pode escolher qualquer data, inclusive passada ou bloqueada. Só não deixa duas gravações no mesmo horário.
+        </p>
+        {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      </div>
+    </Modal>
   );
 }
 

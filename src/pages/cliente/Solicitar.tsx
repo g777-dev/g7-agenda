@@ -4,7 +4,8 @@ import { ArrowLeft, Paperclip, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useAuth } from '../../contexts/AuthContext';
-import { useBloqueios, useWhatsappEquipe } from '../../lib/dados';
+import { useApresentacao, useBloqueios, useWhatsappEquipe } from '../../lib/dados';
+import { CartaoApresentacao } from '../../components/Apresentacao';
 import {
   chaveSlot,
   fimDoMes,
@@ -42,6 +43,7 @@ export default function Solicitar() {
   const { mes: mesUrl } = useParams();
   const navegar = useNavigate();
   const { mostrar } = useToast();
+  const apresentacao = useApresentacao();
   const whatsapp = useWhatsappEquipe();
   const hoje = hojeBR();
   const inicioBloqueios =
@@ -235,6 +237,7 @@ export default function Solicitar() {
       {voltar}
       <h1 className="titulo text-3xl font-bold">Solicitar gravação</h1>
       {alvo.mes && <p className="mt-1 text-apagado first-letter:uppercase">Agenda de {fmtMes(alvo.mes)}</p>}
+      {etapa === 0 && apresentacao?.apresentacao_ativa && <CartaoApresentacao dados={apresentacao} className="mt-4" />}
 
       <ol className="mt-4 flex gap-2" aria-label="Etapas">
         {ETAPAS.map((nome, i) => (

@@ -5,8 +5,11 @@ import { mensagemErro } from '../lib/erros';
 import { Aviso, Botao, Campo, Entrada } from '../components/ui';
 import { LogoG7 } from '../components/comuns';
 import { BotaoInstalar } from '../components/Aparelho';
+import { CartaoApresentacao } from '../components/Apresentacao';
+import { useApresentacao } from '../lib/dados';
 
 export default function Login() {
+  const apresentacao = useApresentacao();
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [verSenha, setVerSenha] = useState(false);
@@ -53,6 +56,8 @@ export default function Login() {
             Preencha VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY (veja o README).
           </Aviso>
         )}
+
+        {apresentacao?.apresentacao_ativa && <CartaoApresentacao dados={apresentacao} className="mb-8" />}
 
         <form onSubmit={entrar} className="space-y-4">
           <h1 className="titulo text-3xl font-bold">

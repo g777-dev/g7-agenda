@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Check, Paperclip, X } from 'lucide-react';
+import { CalendarClock, Check, Paperclip, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios, useTempoReal } from '../../lib/dados';
@@ -17,8 +17,8 @@ import {
   type MapaBloqueios,
 } from '../../lib/datas';
 import { abrirAnexo } from '../../lib/anexos';
-import type { Cliente, Gravacao, PedidoAlteracao, Periodo, Slot, Solicitacao } from '../../lib/tipos';
-import { Aviso, Botao, Cartao, Carregando, Selo, Vazio, useToast } from '../../components/ui';
+import type { Cliente, Gravacao, LocalTipo, PedidoAlteracao, Periodo, Slot, Solicitacao } from '../../lib/tipos';
+import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, Entrada, Modal, Selecao, Selo, Vazio, useToast } from '../../components/ui';
 import { EscolherHorarioModal, ModalMotivo, useConflito, useMover } from '../../components/painel/acoes';
 
 interface Alerta {
@@ -44,6 +44,8 @@ export default function Solicitacoes() {
   const [remarcando, setRemarcando] = useState<PedidoAlteracao | null>(null);
   const [cancelando, setCancelando] = useState<PedidoAlteracao | null>(null);
   const [aprovando, setAprovando] = useState<string | null>(null);
+  const [editandoSol, setEditandoSol] = useState<Solicitacao | null>(null);
+  const [excluindoSol, setExcluindoSol] = useState<Solicitacao | null>(null);
 
   const carregar = useCallback(async () => {
     const [s, p, c, g] = await Promise.all([
@@ -262,6 +264,8 @@ export default function Solicitacoes() {
                 aoAprovar={(slot) => aprovar(s, slot)}
                 aoOutroHorario={() => setOutroHorario(s)}
                 aoRecusar={() => setRecusando(s)}
+                aoEditar={() => setEditandoSol(s)}
+                aoExcluir={() => setExcluindoSol(s)}
               />
             ))}
           </div>
@@ -302,7 +306,140 @@ export default function Solicitacoes() {
       />
       {conflito.modal}
       {modalMover}
+      {editandoSol && (
+        <EditarSolicitacaoModal
+          s={editandoSol}
+          aoFechar={() => setEditandoSol(null)}
+          aoSalvar={() => {
+            setEditandoSol(null);
+            carregar();
+          }}
+        />
+      )}
+      <Modal
+        aberto={!!excluindoSol}
+        aoFechar={() => setExcluindoSol(null)}
+        titulo={`Excluir solicitação de ${excluindoSol?.clientes?.empresa ?? ''}?`}
+        rodape={
+          <>
+            <Botao variante="secundario" onClick={() => setExcluindoSol(null)}>
+              Voltar
+            </Botao>
+            <Botao
+              variante="perigo"
+              icone={<Trash2 className="h-4 w-4" />}
+              onClick={async () => {
+                if (!excluindoSol) return;
+                const { error } = await supabase.from('solicitacoes').delete().eq('id', excluindoSol.id);
+                if (error) return mostrar(mensagemErro(error), 'erro');
+                mostrar('Solicitação excluída.');
+                setExcluindoSol(null);
+                carregar();
+              }}
+            >
+              Excluir de vez
+            </Botao>
+          </>
+        }
+      >
+        <p className="text-sm">A solicitação some da fila e o cliente pode pedir um horário novo.</p>
+      </Modal>
     </div>
+  );
+}
+
+/** Editar as opções de horário, o local e as observações de uma solicitação. */
+function EditarSolicitacaoModal({ s, aoFechar, aoSalvar }: { s: Solicitacao; aoFechar: () => void; aoSalvar: () => void }) {
+  const { mostrar } = useToast();
+  const [d1, setD1] = useState(s.opcao1_data);
+  const [p1, setP1] = useState<Periodo>(s.opcao1_periodo);
+  const [d2, setD2] = useState(s.opcao2_data);
+  const [p2, setP2] = useState<Periodo>(s.opcao2_periodo);
+  const [local, setLocal] = useState<LocalTipo>(s.local_tipo);
+  const [endereco, setEndereco] = useState(s.endereco ?? '');
+  const [obs, setObs] = useState(s.observacoes ?? '');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const salvar = async () => {
+    setErro(null);
+    if (!d1 || !d2) return setErro('Preencha as duas datas.');
+    setSalvando(true);
+    const { error } = await supabase
+      .from('solicitacoes')
+      .update({
+        opcao1_data: d1,
+        opcao1_periodo: p1,
+        opcao2_data: d2,
+        opcao2_periodo: p2,
+        local_tipo: local,
+        endereco: local === 'cliente' ? endereco.trim() || null : null,
+        observacoes: obs.trim() || null,
+        ultima_alteracao: 'Editada pela equipe',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', s.id);
+    setSalvando(false);
+    if (error) return setErro(mensagemErro(error));
+    mostrar('Alterações salvas.');
+    aoSalvar();
+  };
+
+  const periodo = (id: string, v: Periodo, set: (p: Periodo) => void) => (
+    <Selecao id={id} value={v} onChange={(e) => set(e.target.value as Periodo)}>
+      <option value="manha">Manhã</option>
+      <option value="tarde">Tarde</option>
+    </Selecao>
+  );
+
+  return (
+    <Modal
+      aberto
+      aoFechar={aoFechar}
+      titulo={`Editar solicitação de ${s.clientes?.empresa ?? ''}`}
+      rodape={
+        <>
+          <Botao variante="secundario" onClick={aoFechar}>
+            Voltar
+          </Botao>
+          <Botao onClick={salvar} carregando={salvando}>
+            Salvar alterações
+          </Botao>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo rotulo="1ª opção: data" htmlFor="es-d1">
+            <Entrada id="es-d1" type="date" value={d1} onChange={(e) => setD1(e.target.value)} />
+          </Campo>
+          <Campo rotulo="1ª opção: período" htmlFor="es-p1">
+            {periodo('es-p1', p1, setP1)}
+          </Campo>
+          <Campo rotulo="2ª opção: data" htmlFor="es-d2">
+            <Entrada id="es-d2" type="date" value={d2} onChange={(e) => setD2(e.target.value)} />
+          </Campo>
+          <Campo rotulo="2ª opção: período" htmlFor="es-p2">
+            {periodo('es-p2', p2, setP2)}
+          </Campo>
+          <Campo rotulo="Local" htmlFor="es-local">
+            <Selecao id="es-local" value={local} onChange={(e) => setLocal(e.target.value as LocalTipo)}>
+              <option value="estudio">Estúdio da G7</option>
+              <option value="cliente">No local do cliente</option>
+            </Selecao>
+          </Campo>
+          {local === 'cliente' && (
+            <Campo rotulo="Endereço" htmlFor="es-end">
+              <Entrada id="es-end" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
+            </Campo>
+          )}
+        </div>
+        <Campo rotulo="Observações" htmlFor="es-obs">
+          <AreaTexto id="es-obs" rows={4} value={obs} onChange={(e) => setObs(e.target.value)} />
+        </Campo>
+        {erro && <Aviso tipo="erro">{erro}</Aviso>}
+      </div>
+    </Modal>
   );
 }
 
@@ -315,6 +452,8 @@ function CartaoSolicitacao({
   aoAprovar,
   aoOutroHorario,
   aoRecusar,
+  aoEditar,
+  aoExcluir,
 }: {
   s: Solicitacao;
   mapa: MapaBloqueios;
@@ -324,6 +463,8 @@ function CartaoSolicitacao({
   aoAprovar: (slot: Slot) => void;
   aoOutroHorario: () => void;
   aoRecusar: () => void;
+  aoEditar: () => void;
+  aoExcluir: () => void;
 }) {
   const cliente = s.clientes;
   const janela =
@@ -417,6 +558,12 @@ function CartaoSolicitacao({
         </Botao>
         <Botao tamanho="p" variante="perigo" icone={<X className="h-4 w-4" />} onClick={aoRecusar}>
           Recusar
+        </Botao>
+        <Botao tamanho="p" variante="fantasma" icone={<Pencil className="h-4 w-4" />} onClick={aoEditar}>
+          Editar
+        </Botao>
+        <Botao tamanho="p" variante="fantasma" icone={<Trash2 className="h-4 w-4" />} onClick={aoExcluir}>
+          Excluir
         </Botao>
       </div>
     </Cartao>

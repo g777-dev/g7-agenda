@@ -4,7 +4,8 @@ import { CalendarPlus, LogOut } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useAuth } from '../../contexts/AuthContext';
-import { useBloqueios, useTempoReal, useWhatsappEquipe } from '../../lib/dados';
+import { useBloqueios, useTempoReal, useWhatsappEquipe, useApresentacao } from '../../lib/dados';
+import { CartaoApresentacao } from '../../components/Apresentacao';
 import {
   aindaPodeAlterar,
   fmtCriadoEm,
@@ -56,6 +57,7 @@ export default function ClienteInicio() {
   const { cliente } = useAuth();
   const { mostrar } = useToast();
   const whatsapp = useWhatsappEquipe();
+  const apresentacao = useApresentacao();
   const hoje = hojeBR();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [gravacoes, setGravacoes] = useState<Gravacao[]>([]);
@@ -130,6 +132,7 @@ export default function ClienteInicio() {
       <p className="mt-1 text-apagado">Aqui você agenda e acompanha suas gravações com a G7.</p>
 
       <div className="mt-6 space-y-5">
+        {apresentacao?.apresentacao_ativa && <CartaoApresentacao dados={apresentacao} />}
         {janela && !proxima && janela.fim >= hoje && (
           <Aviso tipo="info" titulo={`Sua gravação precisa acontecer até ${fmtData(janela.fim)}`}>
             Escolha um horário entre {fmtData(janela.inicio)} e {fmtData(janela.fim)}. Os primeiros dias depois do

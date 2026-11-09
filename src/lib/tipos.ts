@@ -110,7 +110,19 @@ export interface Janela {
 export interface Configuracao {
   id: number;
   whatsapp_equipe: string | null;
+  senha_padrao: string;
+  apresentacao_ativa: boolean;
+  apresentacao_nome: string | null;
+  apresentacao_cargo: string | null;
+  apresentacao_texto: string | null;
+  apresentacao_foto: string | null;
 }
+
+/** Apresentação da videomaker mostrada ao cliente quando ele entra no sistema. */
+export type Apresentacao = Pick<
+  Configuracao,
+  'apresentacao_ativa' | 'apresentacao_nome' | 'apresentacao_cargo' | 'apresentacao_texto' | 'apresentacao_foto'
+>;
 
 /** Linha devolvida pela RPC ocupacao_slots */
 export interface OcupacaoSlot {
