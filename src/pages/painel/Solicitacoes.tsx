@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, Check, Paperclip, Pencil, Trash2, X } from 'lucide-react';
+import { CalendarClock, Check, Copy, MessageCircle, Paperclip, Pencil, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios, useTempoReal } from '../../lib/dados';
@@ -17,6 +17,7 @@ import {
   type MapaBloqueios,
 } from '../../lib/datas';
 import { abrirAnexo } from '../../lib/anexos';
+import { copiarTexto } from '../../lib/acesso';
 import type { Cliente, Gravacao, LocalTipo, PedidoAlteracao, Periodo, Slot, Solicitacao } from '../../lib/tipos';
 import { AreaTexto, Aviso, Botao, Campo, Cartao, Carregando, Entrada, Modal, Selecao, Selo, Vazio, useToast } from '../../components/ui';
 import { EscolherHorarioModal, ModalMotivo, useConflito, useMover } from '../../components/painel/acoes';
@@ -475,6 +476,9 @@ function CartaoSolicitacao({
     { rotulo: '2ª opção', data: s.opcao2_data, periodo: s.opcao2_periodo },
   ];
 
+  const { mostrar } = useToast();
+  const mensagemGrupo = montarMensagemGrupo(s);
+
   return (
     <Cartao className={`p-4 ${janela ? 'border-l-4 border-l-ambar' : ''}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -547,6 +551,23 @@ function CartaoSolicitacao({
         )}
       </div>
 
+      <div className="mt-3 rounded-lg border border-linha bg-superficie p-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-apagado">
+            <MessageCircle className="h-4 w-4" aria-hidden /> Mensagem para o grupo
+          </p>
+          <Botao
+            tamanho="p"
+            variante="azul"
+            icone={<Copy className="h-4 w-4" />}
+            onClick={() => copiarTexto(mensagemGrupo, mostrar, 'Mensagem copiada. É só colar no grupo.')}
+          >
+            Copiar mensagem
+          </Botao>
+        </div>
+        <p className="whitespace-pre-line text-sm">{mensagemGrupo}</p>
+      </div>
+
       <div className="mt-3 flex flex-wrap gap-2 border-t border-linha pt-3">
         <Botao
           tamanho="p"
@@ -568,4 +589,20 @@ function CartaoSolicitacao({
       </div>
     </Cartao>
   );
+}
+
+function montarMensagemGrupo(s: Solicitacao): string {
+  const nome = s.clientes?.nome_contato?.trim().split(' ')[0] || 'tudo bem';
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  return [
+    `Olá, ${nome}! 👋`,
+    '',
+    'Obrigado por marcar sua gravação com a G7 Soluções Digitais! 🎬',
+    '',
+    'Recebemos suas opções:',
+    `📅 1ª opção: ${cap(fmtSlot(s.opcao1_data, s.opcao1_periodo))}`,
+    `📅 2ª opção: ${cap(fmtSlot(s.opcao2_data, s.opcao2_periodo))}`,
+    '',
+    'Nossa equipe vai confirmar o horário em breve aqui no grupo. Qualquer dúvida, é só chamar! 💙',
+  ].join('\n');
 }
