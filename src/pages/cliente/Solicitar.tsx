@@ -17,7 +17,9 @@ import {
   janelaClienteNovo,
   mesDe,
   motivoSlotFechado,
-  proximoDiaUtil,
+  diaUtilN,
+  primeiroDiaPedido,
+  slotJaComecou,
   somarDias,
 } from '../../lib/datas';
 import { LIMITE_ANEXO, enviarAnexo, removerAnexo, tamanhoLegivel } from '../../lib/anexos';
@@ -81,14 +83,14 @@ export default function Solicitar() {
 
   const alvo = useMemo<Alvo | null>(() => {
     if (!cliente || !pronto || !janelas) return null;
-    const primeiroDia = proximoDiaUtil(hoje, mapa);
+    const primeiroDia = primeiroDiaPedido(mapa);
     if (cliente.tipo === 'novo') {
       if (!cliente.data_onboarding) return { erro: 'sem_onboarding' };
       const janela = janelaClienteNovo(cliente.data_onboarding, mapa);
+      // Se a janela já passou, não trava: abre os próximos 5 dias úteis.
+      const fim = janela.fim < primeiroDia ? diaUtilN(primeiroDia, 4, mapa) : janela.fim;
       const inicio = janela.inicio > primeiroDia ? janela.inicio : primeiroDia;
-      return inicio > janela.fim
-        ? { erro: 'janela_passou', janela }
-        : { inicio, fim: janela.fim, janela, mes: null };
+      return { inicio, fim, janela: { inicio: janela.inicio, fim }, mes: null };
     }
     const mes = mesUrl ?? janelas[0]?.mes;
     if (!mes || !janelas.some((j) => j.mes === mes)) return { erro: 'mes_fechado', mes: mes ?? null };
@@ -102,6 +104,7 @@ export default function Solicitar() {
     (data: string, periodo: Periodo): EstadoSlot => {
       const motivo = motivoSlotFechado(data, periodo, mapa);
       if (motivo) return { estado: 'fechado', rotulo: motivo.length > 18 ? 'Indisponível' : motivo };
+      if (slotJaComecou(data, periodo)) return { estado: 'fechado', rotulo: 'Encerrado' };
       const o = ocupacao.get(chaveSlot(data, periodo));
       if (!o) return { estado: 'livre' };
       if (o.proprio) return { estado: 'ocupado', rotulo: 'Sua gravação' };

@@ -168,6 +168,17 @@ export function prazoAlteracao(iso: string, periodo: Periodo): Date {
   return new Date(inicioSlot(iso, periodo).getTime() - 48 * 3_600_000);
 }
 
+/** O horário já começou (não dá mais para pedir). */
+export function slotJaComecou(iso: string, periodo: Periodo): boolean {
+  return Date.now() >= inicioSlot(iso, periodo).getTime();
+}
+
+/** Primeiro dia que o cliente pode pedir: hoje (se for dia útil) ou o próximo dia útil. */
+export function primeiroDiaPedido(bl: MapaBloqueios): string {
+  const hoje = hojeBR();
+  return ehDiaUtil(hoje, bl) ? hoje : proximoDiaUtil(hoje, bl);
+}
+
 export function aindaPodeAlterar(iso: string, periodo: Periodo): boolean {
   return Date.now() <= prazoAlteracao(iso, periodo).getTime();
 }
