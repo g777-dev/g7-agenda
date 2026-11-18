@@ -5,6 +5,7 @@ import { Botao, Carregando } from './components/ui';
 import { Marca } from './components/comuns';
 import type { Papel } from './lib/tipos';
 import Login from './pages/Login';
+import EntrarG7 from './pages/EntrarG7';
 import ClienteInicio from './pages/cliente/ClienteInicio';
 import Solicitar from './pages/cliente/Solicitar';
 import PainelLayout from './pages/painel/PainelLayout';
@@ -57,6 +58,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<RotaLogin />} />
+      <Route path="/entrar-g7" element={<EntrarG7 />} />
       <Route path="/" element={<Protegida papel="cliente"><ClienteInicio /></Protegida>} />
       <Route path="/agendar" element={<Protegida papel="cliente"><Solicitar /></Protegida>} />
       <Route path="/agendar/:mes" element={<Protegida papel="cliente"><Solicitar /></Protegida>} />
