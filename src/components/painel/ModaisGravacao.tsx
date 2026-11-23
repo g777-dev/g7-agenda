@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Ban, CalendarClock, CircleCheck, CircleX, History, Paperclip, Pencil, Trash2 } from 'lucide-react';
+import { Ban, CalendarClock, CircleCheck, CircleX, Copy, History, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { mensagemErro } from '../../lib/erros';
 import { useBloqueios } from '../../lib/dados';
 import { fmtData, fmtSlot, hojeBR, janelaClienteNovo, somarDias } from '../../lib/datas';
 import { abrirAnexo } from '../../lib/anexos';
+import { copiarTexto } from '../../lib/acesso';
 import type { Cliente, Gravacao, LocalTipo, Periodo, Slot, StatusGravacao } from '../../lib/tipos';
 import { AreaTexto, Aviso, Botao, Campo, Entrada, Modal, Selecao, Selo, useToast } from '../ui';
 import { ResumoHorario } from '../comuns';
@@ -183,6 +184,23 @@ export function GravacaoModal({
               {gravacao.motivo_cancelamento}
             </Aviso>
           )}
+          {confirmada && (
+            <div className="rounded-lg border border-azul/50 bg-azul-suave/30 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <p className="whitespace-pre-line text-sm">{mensagemConfirmacao(gravacao)}</p>
+                <Botao
+                  tamanho="p"
+                  icone={<Copy className="h-4 w-4" />}
+                  onClick={() =>
+                    copiarTexto(mensagemConfirmacao(gravacao), mostrar, 'Mensagem copiada. É só colar no grupo.')
+                  }
+                >
+                  Copiar
+                </Botao>
+              </div>
+            </div>
+          )}
+
           {gravacao.ultima_alteracao && (
             <p className="flex items-center gap-1.5 text-xs text-apagado">
               <History className="h-3.5 w-3.5" aria-hidden /> {gravacao.ultima_alteracao}
@@ -258,6 +276,16 @@ export function GravacaoModal({
       </Modal>
     </>
   );
+}
+
+/** Mensagem curta (2 linhas) para mandar no grupo do cliente depois que a gravação é marcada. */
+function mensagemConfirmacao(g: Gravacao): string {
+  const nome = g.clientes?.nome_contato?.trim().split(' ')[0];
+  const quando = fmtSlot(g.data, g.periodo);
+  return [
+    `Olá${nome ? `, ${nome}` : ''}! Obrigado por marcar sua gravação com a G7 Soluções Digitais 🎬`,
+    `Ficou confirmada para ${quando}. Qualquer dúvida, estou à disposição!`,
+  ].join('\n');
 }
 
 // ---------- Editar qualquer campo de uma gravação (data, período, local, status...) ----------
